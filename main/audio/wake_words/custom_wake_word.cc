@@ -34,10 +34,15 @@ CustomWakeWord::~CustomWakeWord() {
     }
 }
 
-bool CustomWakeWord::Initialize(AudioCodec* codec) {
+bool CustomWakeWord::Initialize(AudioCodec* codec, srmodel_list_t* models_list) {
     codec_ = codec;
 
-    models_ = esp_srmodel_init("model");
+    if (models_list == nullptr) {
+        models_ = esp_srmodel_init("model");
+    } else {
+        models_ = models_list;
+    }
+
     if (models_ == nullptr || models_->num == -1) {
         ESP_LOGE(TAG, "Failed to initialize wakenet model");
         return false;
@@ -80,9 +85,20 @@ void CustomWakeWord::Feed(const std::vector<int16_t>& data) {
         return;
     }
 
-    StoreWakeWordData(data);
+    esp_mn_state_t mn_state;
+    // If input channels is 2, we need to fetch the left channel data
+    if (codec_->input_channels() == 2) {
+        auto mono_data = std::vector<int16_t>(data.size() / 2);
+        for (size_t i = 0, j = 0; i < mono_data.size(); ++i, j += 2) {
+            mono_data[i] = data[j];
+        }
 
-    esp_mn_state_t mn_state = multinet_->detect(multinet_model_data_, const_cast<int16_t*>(data.data()));
+        StoreWakeWordData(mono_data);
+        mn_state = multinet_->detect(multinet_model_data_, const_cast<int16_t*>(mono_data.data()));
+    } else {
+        StoreWakeWordData(data);
+        mn_state = multinet_->detect(multinet_model_data_, const_cast<int16_t*>(data.data()));
+    }
     
     if (mn_state == ESP_MN_STATE_DETECTING) {
         return;
@@ -110,7 +126,7 @@ size_t CustomWakeWord::GetFeedSize() {
     if (multinet_model_data_ == nullptr) {
         return 0;
     }
-    return multinet_->get_samp_chunksize(multinet_model_data_) * codec_->input_channels();
+    return multinet_->get_samp_chunksize(multinet_model_data_);
 }
 
 void CustomWakeWord::StoreWakeWordData(const std::vector<int16_t>& data) {
