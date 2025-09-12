@@ -747,7 +747,7 @@ void LcdDisplay::SetupUI() {
     lv_label_set_text(emotion_label_, FONT_AWESOME_AI_CHIP);
 
     preview_image_ = lv_image_create(content_);
-    lv_obj_set_size(preview_image_, width_ * 0.5, height_ * 0.5);
+    lv_obj_set_size(preview_image_, width_ * 0.9, height_ * 0.9);
     lv_obj_align(preview_image_, LV_ALIGN_CENTER, 0, 0);
     lv_obj_add_flag(preview_image_, LV_OBJ_FLAG_HIDDEN);
 
@@ -815,7 +815,8 @@ void LcdDisplay::SetPreviewImage(const lv_img_dsc_t* img_dsc) {
     
     if (img_dsc != nullptr) {
         // zoom factor 0.5
-        lv_image_set_scale(preview_image_, 128 * width_ / img_dsc->header.w);
+        // lv_image_set_scale(preview_image_, 128 * width_ / img_dsc->header.w);
+        lv_image_set_scale(preview_image_, 256 * width_ / img_dsc->header.w);
         // 设置图片源并显示预览图片
         lv_image_set_src(preview_image_, img_dsc);
         lv_obj_clear_flag(preview_image_, LV_OBJ_FLAG_HIDDEN);
