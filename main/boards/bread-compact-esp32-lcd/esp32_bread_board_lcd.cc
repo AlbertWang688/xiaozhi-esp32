@@ -1,4 +1,4 @@
-#include "wifi_board.h"
+#include "dual_network_board.h"
 #include "codecs/no_audio_codec.h"
 #include "display/lcd_display.h"
 #include "system_reset.h"
@@ -7,7 +7,6 @@
 #include "config.h"
 #include "led/single_led.h"
 
-#include <wifi_station.h>
 #include <esp_log.h>
 #include <driver/i2c_master.h>
 #include <esp_lcd_panel_vendor.h>
@@ -58,7 +57,7 @@ static const gc9a01_lcd_init_cmd_t gc9107_lcd_init_cmds[] = {
  
 #define TAG "ESP32-LCD-MarsbearSupport"
 
-class CompactWifiBoardLCD : public WifiBoard {
+class CompactWifiBoardLCD : public DualNetworkBoard {
 private:
     Button boot_button_;
     Button touch_button_;
@@ -137,11 +136,24 @@ private:
 
         boot_button_.OnClick([this]() {
             auto& app = Application::GetInstance();
-            if (app.GetDeviceState() == kDeviceStateStarting && !WifiStation::GetInstance().IsConnected()) {
-                ResetWifiConfiguration();
+            if (GetNetworkType() == NetworkType::WIFI) {
+                if (app.GetDeviceState() == kDeviceStateStarting) {
+                    // cast to WifiBoard
+                    auto& wifi_board = static_cast<WifiBoard&>(GetCurrentBoard());
+                    wifi_board.EnterWifiConfigMode();
+                    return;
+                }
             }
             gpio_set_level(BUILTIN_LED_GPIO, 1);
             app.ToggleChatState();
+        });
+
+
+        boot_button_.OnDoubleClick([this]() {
+            auto& app = Application::GetInstance();
+            if (app.GetDeviceState() == kDeviceStateStarting || app.GetDeviceState() == kDeviceStateWifiConfiguring) {
+                SwitchNetworkType();
+            }
         });
 
         asr_button_.OnClick([this]() {
@@ -163,6 +175,7 @@ private:
 
 public:
     CompactWifiBoardLCD() :
+        DualNetworkBoard(ML307_TX_PIN, ML307_RX_PIN),
         boot_button_(BOOT_BUTTON_GPIO), touch_button_(TOUCH_BUTTON_GPIO), asr_button_(ASR_BUTTON_GPIO) {
         InitializeSpi();
         InitializeLcdDisplay();
